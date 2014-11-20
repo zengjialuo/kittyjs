@@ -1,0 +1,18 @@
+{
+  "family": "kittyjs",
+  "name": "kittyjs",
+  "version": "1.0.0",
+  "description": "yet another AMD Loader in the browser",
+  "homepage": "http://github.com/zengjialuo/kittyjs",
+  "keywords": ["AMD", "loader"],
+  "author": "JZeng<zengjialuo@gmail.com>",
+
+  "dependencies": {},
+  "devDependencies": {
+    "edp-build": "~"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/zengjialuo/kittyjs.git"
+  }
+}

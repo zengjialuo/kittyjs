@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>loader test</title>
+
+<!-- <script src="impl/vsl/vsl.js"></script> -->
+<script src="impl/esl/esl.js"></script>
+<!-- <script src="impl/requirejs/require.js"></script> -->
+<!-- <script src="impl/needs/needs.js"></script> -->
+<!-- <script src="impl/lsjs/lsjs.js"></script> -->
+<script>
+require.config( {
+    waitSeconds: 5,
+    urlArgs: 'urlArgs',
+    baseUrl: '.',
+    paths: {
+        'css': '../src/css',
+        'js': '../src/js',
+        'abspath': '/test/pathstest',
+        'relapath': 'pathstest/rela'
+    },
+    map: {
+        'usecjs': {
+            simple: 'cjs/simple'
+        },
+        'usecjs/change2amd': {
+            simple: 'amd/simple'
+        }
+    },
+    packages: [
+        'pkgclassic/1.0',
+        {
+            name: 'pkgsetmain',
+            location: 'pkgsetmain/2.0',
+            main: 'index'
+        }
+    ],
+    config: {
+        'moduleconf/index': {
+            'desc': 'index'
+        },
+        'moduleconf/cat': {
+            'desc': 'cat'
+        }
+    },
+    noRequests: {
+        'noRequests/simple/cat': 'noRequests/simple/index',
+        'noRequests/all/cat': '*',
+        'noRequests/complex/child': [ 'noRequests/complex/index1', 'noRequests/complex/index2' ]
+    }
+} );
+require.config( {
+    urlArgs: {
+        css: 'css',
+        amd: 'amd',
+        'amd/simpleDependency': 'amdsd'
+    }
+} );
+</script>
+
+<style>
+.uncheck,
+.checking,
+.pass,
+.fail {
+    width: 60px;
+}
+
+.uncheck { background: #eee; }
+.checking { background: yellow; }
+.pass { background: green; }
+.fail { background: red; }
+
+.cssplugin,
+.cssplugin-local{ visibility: hidden; }
+
+table { width: 250px; float:left; margin-right: 10px;}
+input { font-size: 12px; width: 210px;}
+</style>
+</head>
+
+<body>
+<table>
+    <tr>
+        <th colspan="2" align="left">AMD:</th>
+    </tr>
+    <tr>
+        <td><input value="amd/simple" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/noDefineId" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/objectFactory" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/simpleDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/relativeDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/manyDependencies" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/innerDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/innerRelativeDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/deepDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/deepDependency2" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/deepDependency3" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/simpleCircleDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/simpleCircleDependency2" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/simpleCircleDependency3" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/circleDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/complexCircleDependency" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/complexCircleDependency2" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/complexCircleDependency3" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/hardCircleDependency" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/combine" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/btModuleId" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="lazyDefine" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="meaninglessDefine" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+</table>
+<table>
+    <tr>
+        <th colspan="2" align="left">CJS:</th>
+    </tr>
+    <tr>
+        <td><input value="cjs/simple" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/noDefineId" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/simpleDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/relativeDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/manyDependencies" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/deepDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/circleDependency" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="cjs/combine" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">Plugin:</th>
+    </tr>
+    <tr>
+        <td><input value="loadResource" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/combineplugin" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="amd/combineplugin2" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="multiResources" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="deepResources" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">CSS Plugin:</th>
+    </tr>
+    <tr>
+        <td><input value="globalLoadCss" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="localLoadCss" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">Particular Cases:</th>
+    </tr>
+    <tr>
+        <td><input value="defineInScript" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="defineManyInScript" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="nonstandardId" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+</table>
+<table>
+    <tr>
+        <th colspan="2" align="left">Conf paths:</th>
+    </tr>
+    <tr>
+        <td><input value="relapath" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="abspath" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">Conf map:</th>
+    </tr>
+    <tr>
+        <td><input value="mapVersion" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="longMapFirst" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="nomapGlobal" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">Conf config:</th>
+    </tr>
+    <tr>
+        <td><input value="moduleconf" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">Conf packages:</th>
+    </tr>
+    <tr>
+        <td><input value="stringPackage" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="objectPackage" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <th colspan="2" align="left">Conf urlArgs:</th>
+    </tr>
+    <tr>
+        <td><input value="urlArgs" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+<!--    <tr>
+        <th colspan="2" align="left">Conf noRequests:</th>
+    </tr>
+     <tr>
+        <td><input value="simpleNoRequests" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="allNoRequests" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="complexNoRequests_match1" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="complexNoRequests_match2" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="complexNoRequests_noMatch" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="complexNoRequests_alone" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr> -->
+    <!-- see #10
+    <tr>
+        <th colspan="2" align="left">Read Conf:</th>
+    </tr>
+    <tr>
+        <td><input value="readConfig" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+     -->
+</table>
+
+<script>
+
+function defineInScript( stateTd, callback ) {
+    define('define-in-script', { name: 'define-in-script' });
+    require([ 'define-in-script' ], function (mod) {
+        if (mod.name === 'define-in-script') {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        callback();
+    });
+}
+
+function defineManyInScript( stateTd, callback ) {
+    define('define-in-script/cat',
+        ['require', './index'],
+        function ( r ) {
+            return {
+                name: 'define-in-script/cat',
+                check: function () {
+                    return r( './index' ).name == 'define-in-script/index';
+                }
+            };
+        }
+    );
+
+    define(
+        'define-in-script/dog',
+        [],
+        function () {
+            return {
+                name: 'define-in-script/dog'
+            };
+        }
+    );
+
+    define(
+        'define-in-script/lion',
+        [],
+        function () {
+            return {
+                name: 'define-in-script/lion'
+            };
+        }
+    );
+
+    define(
+        'define-in-script/tiger',
+        [],
+        function () {
+            return {
+                name: 'define-in-script/tiger'
+            };
+        }
+    );
+
+    define(
+        'define-in-script/index',
+        [
+            'require',
+            './cat',
+            './dog',
+            'define-in-script/tiger',
+            './lion'
+        ],
+        function ( r, cat, dog, tiger ) {
+            var lion = r( './lion' );
+
+            return {
+                name: 'define-in-script/index',
+                check: function () {
+                    var valid =
+                        cat.name == 'define-in-script/cat' && cat.check()
+                        && dog.name == 'define-in-script/dog'
+                        && tiger.name == 'define-in-script/tiger'
+                        && lion.name == 'define-in-script/lion';
+                    return valid;
+                }
+            };
+        }
+    );
+
+    require([ 'define-in-script/index' ], function (index) {
+        if (index.check()) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        callback();
+    });
+}
+
+function nonstandardId( stateTd, callback ) {
+    define('nonstandard: define$in-script/cat.js',
+        ['require', './index.js'],
+        function ( r ) {
+            return {
+                name: 'nonstandard: define$in-script/cat.js',
+                check: function () {
+                    return r( './index.js' ).name == 'nonstandard: define$in-script/index.js';
+                }
+            };
+        }
+    );
+
+    define(
+        'nonstandard: define$in-script/dog.js',
+        [],
+        function () {
+            return {
+                name: 'nonstandard: define$in-script/dog.js'
+            };
+        }
+    );
+
+    define(
+        'nonstandard: define$in-script/lion.js',
+        [],
+        function () {
+            return {
+                name: 'nonstandard: define$in-script/lion.js'
+            };
+        }
+    );
+
+    define(
+        'nonstandard: define$in-script/tiger.js',
+        [],
+        function () {
+            return {
+                name: 'nonstandard: define$in-script/tiger.js'
+            };
+        }
+    );
+
+    define(
+        'nonstandard: define$in-script/index.js',
+        [
+            'require',
+            './cat.js',
+            './dog.js',
+            'nonstandard: define$in-script/tiger.js',
+            './lion.js'
+        ],
+        function ( r, cat, dog, tiger ) {
+            var lion = r( './lion.js' );
+
+            return {
+                name: 'nonstandard: define$in-script/index.js',
+                check: function () {
+                    var valid =
+                        cat.name == 'nonstandard: define$in-script/cat.js' && cat.check()
+                        && dog.name == 'nonstandard: define$in-script/dog.js'
+                        && tiger.name == 'nonstandard: define$in-script/tiger.js'
+                        && lion.name == 'nonstandard: define$in-script/lion.js';
+                    return valid;
+                }
+            };
+        }
+    );
+
+    require([ 'nonstandard: define$in-script/index.js' ], function (index) {
+        if (index.check()) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        callback();
+    });
+}
+
+function readConfig( stateTd, callback ) {
+    var conf = require.config();
+    var ok = conf.baseUrl == './'
+        && conf.paths.css == '../src/css'
+        && conf.paths.abspath == '/test/pathstest'
+        && conf.map.usecjs.simple == 'cjs/simple'
+        && conf.map['usecjs/change2amd'].simple == 'amd/simple'
+        && conf.packages[0] == 'pkgclassic/1.0'
+        && conf.packages[1].name == 'pkgsetmain'
+        && conf.config['moduleconf/cat'].desc == 'cat'
+        && conf.urlArgs['*'] == 'urlArgs'
+        && conf.urlArgs['amd/simpleDependency'] == 'amdsd';
+
+    if (ok) {
+        conf = require.config({
+            paths: {
+                'justfortest': 'justfortestpath'
+            }
+        });
+        ok = conf.baseUrl == './'
+            && conf.paths.css == '../src/css'
+            && conf.paths.abspath == '/test/pathstest'
+            && conf.map.usecjs.simple == 'cjs/simple'
+            && conf.map['usecjs/change2amd'].simple == 'amd/simple'
+            && conf.packages[0] == 'pkgclassic/1.0'
+            && conf.packages[1].name == 'pkgsetmain'
+            && conf.config['moduleconf/cat'].desc == 'cat'
+            && conf.urlArgs['*'] == 'urlArgs'
+            && conf.urlArgs['amd/simpleDependency'] == 'amdsd'
+            && conf.paths.justfortest == 'justfortestpath';
+    }
+
+    if (ok) {
+        stateTd.className = 'pass';
+    }
+    else {
+        stateTd.className = 'fail';
+    }
+    callback();
+}
+
+function hasModuleRequest( moduleId ) {
+    var scripts = document.getElementsByTagName( 'script' );
+    var len = scripts.length;
+
+    while ( len-- ) {
+        if ( scripts[ len ].getAttribute( 'data-require-id' ) == moduleId ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function complexNoRequests_match1( stateTd, callback ) {
+    require( ['noRequests/complex/child/cat', 'noRequests/complex/index1' ],
+        function (cat, index) {
+            if (
+                !hasModuleRequest('noRequests/complex/child/cat')
+                && cat.name == 'noRequests/complex/child/cat'
+                && index.name == 'noRequests/complex/index1'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+function complexNoRequests_match2( stateTd, callback ) {
+    require( ['noRequests/complex/index2', 'noRequests/complex/child/dog'],
+        function (index, dog) {
+            if (
+                !hasModuleRequest('noRequests/complex/child/dog')
+                && dog.name == 'noRequests/complex/child/dog'
+                && index.name == 'noRequests/complex/index2'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+function complexNoRequests_noMatch( stateTd, callback ) {
+    require( ['noRequests/complex/child/tiger', 'noRequests/complex/index3' ],
+        function (tiger, index) {
+            if (
+                hasModuleRequest('noRequests/complex/child/tiger')
+                && tiger.name == 'noRequests/complex/child/tiger'
+                && index.name == 'noRequests/complex/index3'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+function complexNoRequests_alone( stateTd, callback ) {
+    require( ['noRequests/complex/child/lion', 'noRequests/complex/index3' ],
+        function (lion, index) {
+            if (
+                hasModuleRequest('noRequests/complex/child/lion')
+                && lion.name == 'noRequests/complex/child/lion'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+function simpleNoRequests( stateTd, callback ) {
+    require( ['noRequests/simple/cat', 'noRequests/simple/index' ],
+        function (cat, index) {
+            if (
+                !hasModuleRequest('noRequests/simple/cat')
+                && cat.name == 'noRequests/simple/cat'
+                && index.name == 'noRequests/simple/index'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+function allNoRequests( stateTd, callback ) {
+    require( ['noRequests/all/cat', 'noRequests/all/index' ],
+        function (cat, index) {
+            if (
+                !hasModuleRequest('noRequests/all/cat')
+                && cat.name == 'noRequests/all/cat'
+                && index.name == 'noRequests/all/index'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+
+function checkNormalModule( name, stateTd, module, callback ) {
+    if (
+        module
+        && module.name == name
+        && ( typeof module.check != 'function'
+             || module.check() )
+    ) {
+        stateTd.className = 'pass';
+    }
+    else {
+        stateTd.className = 'fail';
+    }
+
+    if ( typeof callback == 'function' ) {
+        setTimeout( callback, 1 );
+    }
+}
+
+function meaninglessDefine( stateTd, callback ) {
+    define({});
+    require([ 'meaninglessDefine/index' ], function ( index ) {
+        stateTd.className = index.name == 'meaninglessDefine/index' ? 'pass' : 'fail';
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    })
+}
+
+function lazyDefine( stateTd, callback ) {
+    require( [ 'amd/lazyDefine/index' ], function ( index ) {
+        if ( window.__eslIsLazyDefine && index.name == 'amd/lazyDefine/index' ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    } );
+}
+
+function loadResource( stateTd, callback ) {
+    require( [ 'plugin/html!plugin/resource' ], function ( text ) {
+        if ( text == 'plugin/html!plugin/resource' ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    } );
+}
+
+function nomapGlobal( stateTd, callback ) {
+    require( [ 'simple/index' ], function ( module ) {
+        checkNormalModule( 'simple/index', stateTd, module, callback );
+    } );
+}
+
+function longMapFirst( stateTd, callback ) {
+    require( [ 'usecjs/change2amd' ], function ( module ) {
+        checkNormalModule( 'usecjs/change2amd', stateTd, module, callback );
+    } );
+}
+
+function mapVersion( stateTd, callback ) {
+    require( [ 'usecjs/index' ], function ( module ) {
+        checkNormalModule( 'usecjs/index', stateTd, module, callback );
+    } );
+}
+
+function objectPackage( stateTd, callback ) {
+    require( [ 'pkgsetmain' ], function ( module ) {
+        checkNormalModule( 'pkgsetmain', stateTd, module, callback );
+    } );
+}
+
+function stringPackage( stateTd, callback ) {
+    require( [ 'pkgclassic' ], function ( module ) {
+        checkNormalModule( 'pkgclassic', stateTd, module, callback );
+    } );
+}
+
+function globalLoadCss( stateTd, callback ) {
+    stateTd.className = 'pass cssplugin';
+
+    require( [ 'css!cssplugin/style.css' ], function () {
+        callback();
+    } );
+}
+
+function localLoadCss( stateTd, callback ) {
+    stateTd.className = 'pass cssplugin-local';
+
+    require( [ 'cssplugin/index' ], function ( mod ) {
+        if ( mod.name != 'cssplugin/index' ) {
+            stateTd.className = 'fail';
+        }
+
+        callback();
+    } );
+}
+
+function multiResources( stateTd, callback ) {
+    stateTd.className = 'checking';
+    require(['multiResources/p'], function () {
+        require(['multiResources/index'], function ( index ) {
+            if ( index.check() ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+            callback();
+        });
+    });
+}
+
+function urlArgs( stateTd, callback ) {
+    stateTd.className = 'pass';
+
+    var scripts = document.getElementsByTagName( 'script' );
+    var len = scripts.length;
+    while ( len-- ) {
+        var script = scripts[ len ];
+        var moduleId = script.getAttribute( 'data-require-id' );
+        var src = script.getAttribute( 'src' );
+
+        if ( !moduleId ) {
+            continue;
+        }
+
+        if ( moduleId == 'css' ) {
+            if ( !/(&|\?)css$/.test( src ) ) {
+                stateTd.className = 'fail';
+                break;
+            }
+        }
+        else if ( /^amd\/simpleDependency(\/|$)/.test(moduleId) ) {
+            if ( !/(&|\?)amdsd$/.test( src ) ) {
+                stateTd.className = 'fail';
+                break;
+            }
+        }
+        else if ( /^amd(\/|$)/.test(moduleId) ) {
+            if ( !/(&|\?)amd$/.test( src ) ) {
+                stateTd.className = 'fail';
+                break;
+            }
+        }
+        else {
+            if ( !/(&|\?)urlArgs$/.test( src ) ) {
+                stateTd.className = 'fail';
+                break;
+            }
+        }
+    }
+    callback();
+}
+
+(function () {
+
+    if ( !window.console ) {
+        var text = document.createElement( 'textarea' );
+        text.style.width = "800px";
+        text.style.height = "400px";
+        if ( !/[\?|]console/.test( location.search ) ) {
+            text.style.display = 'none';
+        }
+        document.body.appendChild( text );
+        window.console = { log: function ( str ) {
+            text.value += '\n' + str;
+        } };
+    }
+
+
+    document.body.onclick = function ( e ) {
+        e = e || window.event;
+        var target = e.srcElement || e.target;
+
+        if ( target.tagName == 'INPUT' && target.getAttribute( 'type' ) == 'button' ) {
+            checking( target, new Function() );
+        }
+    };
+
+    function getStateTd( td ) {
+        td = td.parentNode.nextSibling;
+        while ( td ) {
+            if ( td.nodeType == 1 && td.tagName == 'TD' ) {
+                break;
+            }
+
+            td = td.nextSibling;
+        }
+
+        return td;
+    }
+
+    function checking( target, callback ) {
+        var stateTd = getStateTd( target );
+        stateTd.className = 'checking';
+        var value = target.value;
+
+        if ( window[ value ] ) {
+            window[ value ]( stateTd, callback );
+        }
+        else {
+            var moduleId = target.value + '/index';
+
+            require( [ moduleId ], function ( module ) {
+                checkNormalModule( moduleId, stateTd, module, callback );
+            } );
+        }
+    }
+
+
+    var inputs = document.getElementsByTagName( 'input' );
+    var len = inputs.length;
+    var buttons = [];
+    while ( len-- ) {
+        buttons.unshift( inputs[ len ] );
+    }
+
+    var index = 0;
+    len = buttons.length;
+    function checkNext() {
+        if ( index < len ) {
+            var button = buttons[ index++ ];
+            if ( button.disabled
+                || ( autostartIgnore
+                     && button.getAttribute( 'data-ignore' ) == autostartIgnore
+                    )
+            ) {
+                checkNext();
+            }
+            else {
+                checking( button, checkNext );
+            }
+        }
+        else {
+            alert( (new Date) - now )
+        }
+    }
+
+    var autostartIgnore;
+    if ( /[\?|]autostart(-([a-z]+))?/.test( location.search ) ) {
+        var now = new Date;
+        autostartIgnore = RegExp.$2;
+        setTimeout(function () {
+            now = new Date;
+            checkNext();
+        }, 1);
+    }
+
+})();
+
+
+</script>
+</body>
+</html>
