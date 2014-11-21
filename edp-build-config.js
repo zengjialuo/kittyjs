@@ -2,7 +2,7 @@
 
 var path = require( 'path' );
 exports.input = path.resolve( __dirname, 'src' );
-exports.output = path.resolve( __dirname, 'output' );
+exports.output = path.resolve( __dirname, 'dist' );
 
 // var moduleEntries = 'html,htm,phtml,tpl,vm,js';
 // var pageEntries = 'html,htm,phtml,tpl,vm';

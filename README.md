@@ -12,8 +12,9 @@ it was originally named as 'SimpleAndNaiveJS', since its implement is really sim
 | :-- | --:| --: |
 | Size      | 2.8kb  | 6.2kb |
 
-
 ## Usage
+```html
+<script src="http://bcscdn.baidu.com/weigou-baidu-com/kittyjs/kitty.js"></script>
+```
 
-same with requireJS
-
+config options is same with requireJS
