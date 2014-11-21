@@ -16,9 +16,9 @@ it was originally named as 'SimpleAndNaiveJS', since its implement is really sim
 | Timeout handler| NO | YES | YES |
 
 ## Usage
+
 ```html
-<script src="http://bcscdn.baidu.com/weigou-baidu-com/kittyjs/kitty.js"></script>
+<script src="http://rigel.baidustatic.com/wg_biz/kitty/kitty.js"></script>
 ```
 
 config options is same with requireJS
-
