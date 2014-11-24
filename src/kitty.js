@@ -1,4 +1,4 @@
-(function (global) {
+(function (global, document) {
 
     var config = {};
 
@@ -25,35 +25,35 @@
         EXECUTED: 5
     };
 
-
+    var blank = function () {};
     var _cid = 0;
     function cid() {
         return './async-' + _cid++;
     }
 
     function dirName(uri) {
-        uri = uri.split('/');
-        if (uri[uri.length-1] === '') { uri.pop(); }
-        uri.pop();
-        return uri.join('/'); 
+        var dir = uri.match(/([^?#]*)(\/[^$])/);
+        return (dir && dir[1]) || '';
     }
 
-    function getProp(object, prop) {
-        if (!prop) { return prop; }
-        var segment = prop.split('.');
-        for (var i = 0; i < segment.length; i++) {
-            object = object[segment[i]];
-            if (!object) { return object; }
+    function getGlobalVar(prop) {
+        return eval('global.' + prop);
+    }
+
+    function isType(obj, type) {
+        return toString.call(obj) === '[object ' + type + ']';
+    }
+
+    function each(source, iterator) {
+        if (isType(source, 'Array')) {
+            for (var i = 0, len = source.length; i < len; i++) {
+                if (iterator(source[i], i) === false) {
+                    break;
+                }
+            }
         }
-        return object;
     }
 
-    function isArray(obj) {
-        return toString.call(obj) === '[object Array]';
-    }
-    function isString(obj) {
-        return toString.call(obj) === '[object String]';
-    }
     function isBuiltinModule(id) {
         var builtinMOdule = {
             'require': 1,
@@ -85,64 +85,63 @@
         // ref: http://goo.gl/JHfFW
         var scripts = document.getElementsByTagName('script');
 
-        for (var i = scripts.length - 1; i >= 0; i--) {
-            var script = scripts[i];
+        each(scripts, function (script) {
             if (script.readyState === 'interactive') {
                 interactiveScript = script;
-                return interactiveScript;
+                return false;
             }
-        }
+        });
+        return interactiveScript;
     }
 
     function Module(id) {
         var mod = this;
-        this.id = id;
-        this.uri = id2uri(id);
-        this.isDepsDec = true;
-        this.deps = [];
-        this.factory = function (){};
-        this.exports = {};
+        mod.id = id;
+        mod.uri = id2uri(id);
+        mod.isDepsDec = true;
+        mod.deps = [];
+        mod.factory = blank;
+        mod.exports = {};
 
-        this.state = STATUS.UNFETCH;
-        this.remain;
-        this.comleteLoadListeners = [];
+        mod.state = STATUS.UNFETCH;
+        mod.comleteLoadListeners = [];
 
-        this.require = requireFactory(this.id);
+        mod.require = requireFactory(mod.id);
 
-        this.require.toUrl = function (id) {
+        mod.require.toUrl = function (id) {
             var absId = resolveId(id, mod.id);
             return id2uri(absId);
         };
 
-        this.normalize = function (name) {
+        mod.normalize = function (name) {
             return resolveId(name, mod.id);
         };
 
-        this.requireModule = function (id) {
+        mod.requireModule = function (id) {
             return cachedMod[ resolveId(id, mod.id) ];
         };
 
-        this.config = function () {
+        mod.config = function () {
             return mod._config;
         };
 
-        this._config = (config.config && config.config[id]) || {};
+        mod._config = (config.config && config.config[id]) || {};
     }
 
     Module.prototype.getDepsExport = function () {
-        if (this.state < STATUS.LOADED) {
+        var mod = this;
+        if (mod.state < STATUS.LOADED) {
             throw new Error('getDepsExport before loaded');
         }
 
-        var mod = this;
         var exports = [];
 
-        if (!this.isDepsDec) {
+        if (!mod.isDepsDec) {
             exports = [ mod.require, mod.exports, mod ];
         } else  {
-            var deps = this.deps || [];
-            var argsLen = this.factory.length < deps.length
-                ? this.factory.length
+            var deps = mod.deps || [];
+            var argsLen = mod.factory.length < deps.length
+                ? mod.factory.length
                 : deps.length;
             for (var i = 0; i < argsLen; i++) {
                 switch (deps[i]) {
@@ -164,86 +163,89 @@
     };
 
     Module.prototype.load = function(callback) {
-        if (this.state >= STATUS.LOADING) {return;}
-        if (this.state === STATUS.FETCHING) {return;}
-        if (this.state <= STATUS.UNFETCH) {
-            this.fetch();
+        var mod = this;
+
+        if (mod.state === STATUS.FETCHING) { return;}
+        if (mod.state <= STATUS.UNFETCH) {
+            mod.fetch();
             return;
         }
-        this.state = STATUS.LOADING;
+        mod.state = STATUS.LOADING;
 
-        var me = this;
-        var deps = this.deps || [];
+        var deps = mod.deps || [];
 
-        me.remain = deps.length;
+        mod.remain = deps.length;
 
         function callback() {
-            me.remain--;
-            if (me.remain === 0) {
-                me.onload();
+            mod.remain--;
+            if (mod.remain === 0) {
+                mod.onload();
             }
         }
 
-        for (var i = 0; i < deps.length; i++) {
-            if (isBuiltinModule(deps[i])) {
-                this.remain--;
-                continue;
+        each(deps, function (dep) {
+            if (isBuiltinModule(dep)) {
+                mod.remain--;
+                return;
             }
 
-            if (deps[i].indexOf('!') > -1) {
+            if (dep.indexOf('!') > -1) {
                 // plugin dependence
-                loadPlugin(me, deps[i], callback);
+                loadPlugin(mod, dep, callback);
 
             } else {
-                var absId = resolveId(deps[i], this.id);
+                var absId = resolveId(dep, mod.id);
                 var m = getModule(absId);
-                if (m.state >= STATUS.LOADED || (m.state === STATUS.LOADING && !me.isForce)) {
+                if (m.state >= STATUS.LOADED || (m.state === STATUS.LOADING && !mod.isForce)) {
                     //  equal situation is for circle dependency
-                    me.remain--;
-                    continue;
+                    mod.remain--;
+                    return;
                 }
                 m.comleteLoadListeners.push(callback);
-                if (m.state < STATUS.LOADED) {
+                if (m.state < STATUS.LOADING) {
                     m.load();
                 }
             }
-        }
-        if (this.remain === 0) {
-            this.onload();
+        });
+
+        if (mod.remain === 0) {
+            mod.onload();
         }
     };
 
     Module.prototype.onload = function () {
-        if (this.state >= STATUS.LOADED) { return ; }
-        this.state = STATUS.LOADED;
+        var mod = this;
+        if (mod.state >= STATUS.LOADED) { return ; }
+        mod.state = STATUS.LOADED;
 
-        var listeners = this.comleteLoadListeners;
-        for (var i = 0; i < listeners.length; i++) {
-            listeners[i]();
-        }
+        var listeners = mod.comleteLoadListeners;
+        each(listeners, function (listener) {
+            listener();
+        });
 
-        this.callback && this.callback();
+        mod.callback && mod.callback();
     };
 
     Module.prototype.exec = function () {
-        if (this.state >= STATUS.EXECUTED) { return this.exports; }
+        var mod = this;
+        if (mod.state >= STATUS.EXECUTED) { return mod.exports; }
 
-        var args = this.getDepsExport();
-        if (typeof this.factory === 'function') {
-            var ret = this.factory.apply(null, args);
-            this.exports = ret || this.exports;
+        var args = mod.getDepsExport();
+        if (isType(mod.factory, 'Function')) {
+            var ret = mod.factory.apply(null, args);
+            mod.exports = ret || mod.exports;
         } else {
-            this.exports = this.factory;
+            mod.exports = mod.factory;
         }
-        this.state = STATUS.EXECUTED;
-        return this.exports;
+        mod.state = STATUS.EXECUTED;
+        return mod.exports;
     };
 
 
 
     Module.prototype.fetch = function () {
-        var me = this;
-        me.state = STATUS.FETCHING;
+        var mod = this;
+        mod.state = STATUS.FETCHING;
 
         function onloadListener() {
             var readyState = script.readyState;
@@ -252,13 +254,13 @@
                 || /^(loaded|complete)$/.test(readyState)
             ) {
 
-                me.state = STATUS.FETCHED;
-                me.load();
+                mod.state = STATUS.FETCHED;
+                mod.load();
                 interactiveScript = null;
             }
         }
 
-        var uri = this.uri;
+        var uri = mod.uri;
         var script = document.createElement('script');
 
         if (script.readyState) {
@@ -269,7 +271,7 @@
         }
 
         script.src = uri + '.js';
-        script.setAttribute('data-module-id', this.id);
+        script.setAttribute('data-module-id', mod.id);
         script.async = true;
         appendScript(script);
     };
@@ -277,9 +279,11 @@
 
     var headElement = document.getElementsByTagName('head')[0];
     var baseElement = document.getElementsByTagName('base')[0];
+
     if (baseElement) {
         headElement = baseElement.parentNode;
     }
+
     function appendScript(script) {
         currentlyAddingScript = script;
 
@@ -340,7 +344,7 @@
             // defind(deps, factory)
             // defind(id, factory)
             factory = deps;
-            if (isArray(id)) {
+            if (isType(id, 'Array')) {
                 deps = id;
                 id = '';
             } else {
@@ -348,7 +352,7 @@
             }
         }
         var isDepsDec = true;
-        if (!isArray(deps) && typeof (factory) === 'function') {
+        if (!isType(deps, 'Array') && isType(factory, 'Function')) {
             deps = [];
             factory.toString()
                 .replace(/(\/\*([\s\S]*?)\*\/|([^:]|^)\/\/(.*)$)/mg, '')
@@ -380,7 +384,7 @@
 
     function requireFactory(base) {
         return function (deps, callback, isForce) {
-            if (!isArray(deps)) {
+            if (!isType(deps, 'Array')) {
                 // require( 'a' ) or require( 'a!./b' )
                 var parsedId = parseId(deps);
                 if (parsedId.resourceId) {
@@ -396,16 +400,15 @@
                 var randomId = resolveId(cid(), base);
                 var mod = new Module(randomId);
                 mod.deps = deps;
-                mod.factory = callback || function(){};
+                mod.factory = callback || blank;
                 mod.callback = function() {
-                    for (var i = 0; i < mod.deps.length; i++) {
-                        if (mod.deps[i].indexOf('!') === -1
-                            && !isBuiltinModule(mod.deps[i])) {
-                            var absId = resolveId(mod.deps[i], mod.id);
-                            getModule(absId).exec();
+                    each(mod.deps, function (dep) {
+                        if (dep.indexOf('!') === -1
+                            && !isBuiltinModule(dep)) {
+                            mod.require(dep);
                         }
-                    }
-                    this.exec();
+                    });
+                    mod.exec();
                 };
                 mod.state = STATUS.FETCHED;
                 mod.isForce = isForce;
@@ -430,26 +433,26 @@
     function relativeUri(uri, base) {
         var segment = base.split('/').concat(uri.split('/'));
         var path = [];
-        for (var i = 0; i < segment.length; i++) {
-            if (!segment[i] || segment[i] === '.') { continue; }
-            if (segment[i] === '..') {
+
+        each(segment, function (part) {
+            if (!part || part === '.') { return; }
+            if (part === '..') {
                 path.pop();
             } else {
-                path.push(segment[i]);
+                path.push(part);
             }
-        }
+        });
 
         return path.join('/');
     }
 
     function id2uri(id) {
-        for (var i = 0; i < pathsList.length; i++) {
-            var pathConf = pathsList[i];
+        each(pathsList, function (pathConf) {
             if (hasPrefix(id, pathConf.k)) {
                 id = id.replace(pathConf.k, pathConf.v);
-                break;
+                return;
             }
-        }
+        });
 
         if (id.charAt(0) === '/' || id.indexOf('http') === 0) {
             return id;
@@ -476,35 +479,36 @@
     }
 
     function mappedId(id, base) {
-        for (var i = 0; i < mapList.length; i++) {
-            var map = mapList[i];
+        each(mapList, function (map) {
             if (hasPrefix(base, map.k) || map.k === '*') {
-                var key = map.v;
-                for (var j = 0; j < key.length; j++) {
-                    if (hasPrefix(id, key[j].k)) {
-                        id = id.replace(key[j].k, key[j].v);
-                        break;
+                each(map.v, function (key) {
+                    if (hasPrefix(id, key.k)) {
+                        id = id.replace(key.k, key.v);
+                        return false;
                     }
-                }
-                break;
+                });
+
+                return false;
             }
-        }
+        });
+
         return id;
     }
 
     function packagedId(id) {
-        for (var i = 0; i < config.packages.length; i++) {
-            var packageConf = config.packages[i];
+        each(config.packages, function (packageConf) {
             if (id === packageConf.name) {
                 id = packageConf.name + '/' + (packageConf.main || 'main');
+                return false;
             }
-        }
+        });
+
         return id;
     }
 
     function extend(object, source) {
         for (var key in source) {
-            if (!object[key] || isString(object[key])) {
+            if (!object[key] || isType(object[key], 'String')) {
                 object[key] = source[key];
             } else {
                 extend(object[key], source[key]);
@@ -537,11 +541,13 @@
         m.factory = function() {
             var t;
             var depsExport = [];
-            for (var i = 0; i < m.deps.length; i++) {
-                depsExport.push( m.require(m.deps[i]) );
-            }
+
+            each(m.deps, function (dep) {
+                depsExport.push( m.require(dep) );
+            });
+
             var exports = depsExport;
-            m.shim.exports && (exports = getProp(global, m.shim.exports));
+            m.shim.exports && (exports = getGlobalVar(m.shim.exports));
             if (m.shim.init && (t = m.shim.init.apply(global, depsExport))) {
                 exports = t;
             }
@@ -550,15 +556,14 @@
 
         m.state = STATUS.UNFETCH;
         m.fetch = function () {
-            var me = this;
-            if (this.state >= STATUS.FETCHING) {return;}
+            if (m.state >= STATUS.FETCHING) {return;}
 
-            if (this.deps && this.deps.length !== 0) {
-                this.require(this.deps, function(){
-                    Module.prototype.fetch.call(me);
+            if (m.deps && m.deps.length !== 0) {
+                m.require(m.deps, function(){
+                    Module.prototype.fetch.call(m);
                 });
             } {
-                Module.prototype.fetch.call(me);
+                Module.prototype.fetch.call(m);
             }
         };
     }
@@ -574,9 +579,8 @@
             }
         }
 
-        for (var i = 0; i < config.packages.length; i++) {
-            var packageConf = config.packages[i];
-            if (isString(packageConf)) {
+        each(config.packages, function (packageConf, i) {
+            if (isType(packageConf, 'String')) {
                 var segment = packageConf.split('/');
                 config.packages[i] = {
                     name: segment[0],
@@ -584,24 +588,24 @@
                     main: 'main'
                 };
             }
-            packageConf = config.packages[i];
+
             packageConf.main && (packageConf.main = packageConf.main.replace('.js',''));
             if (packageConf.location) {
                 config.paths[packageConf.name] = packageConf.location;
             }
-        }
+        });
 
         mapList = mapToSortedList(config.map);
-        for (var i = 0; i < mapList.length; i++) {
-            mapList[i].v = mapToSortedList(mapList[i].v);
-        }
+        each(mapList, function (map) {
+            map.v = mapToSortedList(map.v);
+        });
 
         pathsList = mapToSortedList(config.paths);
 
         var shims = config.shim;
         for (var key in shims) {
             var shim = shims[key];
-            if (isArray(shim)) {
+            if (isType(shim, 'Array')) {
                 shims[key] = shim = {
                     deps: shim
                 };
@@ -615,4 +619,4 @@
     global.define = define;
     global.require = require;
 
-})(window);
+})(window, document);
