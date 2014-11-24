@@ -37,7 +37,13 @@
     }
 
     function getGlobalVar(prop) {
-        return eval('global.' + prop);
+        var object = global;
+        var segment = prop.split('.');
+        each(segment, function (part) {
+            object = object[part];
+            if (!object) return false;
+        });
+        return object;
     }
 
     function isType(obj, type) {
@@ -104,7 +110,7 @@
         mod.exports = {};
 
         mod.state = STATUS.UNFETCH;
-        mod.comleteLoadListeners = [];
+        mod.listeners = [];
 
         mod.require = requireFactory(mod.id);
 
@@ -201,7 +207,7 @@
                     mod.remain--;
                     return;
                 }
-                m.comleteLoadListeners.push(callback);
+                m.listeners.push(callback);
                 if (m.state < STATUS.LOADING) {
                     m.load();
                 }
@@ -218,7 +224,7 @@
         if (mod.state >= STATUS.LOADED) { return ; }
         mod.state = STATUS.LOADED;
 
-        var listeners = mod.comleteLoadListeners;
+        var listeners = mod.listeners;
         each(listeners, function (listener) {
             listener();
         });
