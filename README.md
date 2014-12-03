@@ -1,6 +1,6 @@
-# KittyJS(SimpleAndNaiveJS)
+# KittyJS
 
-KittyJS is a super lightweight but indeed complete AMD-compliant module loader with:
+KittyJS is a super lightweight but complete AMD-compliant module loader with:
 
 - Loader Plugin supported;
 - Common Config supported, include BaseUrl、paths、packages、map、config and shim.

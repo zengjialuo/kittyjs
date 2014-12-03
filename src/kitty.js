@@ -1,8 +1,12 @@
+/**
+ * @file kitty.js
+ * @author zengjialuo(zengjialuo@gmail.com)
+ */
+
 (function (global, document) {
 
-    var config = {};
-
     var cwd = dirName(location.pathname);
+
     var config = {
         baseUrl: cwd,
         paths: {},
@@ -12,7 +16,6 @@
     };
     var mapList = [];
     var pathsList = [];
-    var toString = Object.prototype.toString;
 
     var cachedMod = {};
 
@@ -31,21 +34,17 @@
         return './async-' + _cid++;
     }
 
-    function dirName(uri) {
-        var dir = uri.match(/([^?#]*)(\/[^$])/);
-        return (dir && dir[1]) || '';
-    }
-
     function getGlobalVar(prop) {
         var object = global;
         var segment = prop.split('.');
         each(segment, function (part) {
             object = object[part];
-            if (!object) return false;
+            if (!object) { return false; }
         });
         return object;
     }
 
+    var toString = Object.prototype.toString;
     function isType(obj, type) {
         return toString.call(obj) === '[object ' + type + ']';
     }
@@ -341,22 +340,23 @@
     }
 
     function define(id, deps, factory) {
-        if (arguments.length === 1) {
-            // define(factory)
-            factory = id;
-            id = '';
-            deps = null;
-        } else if (arguments.length === 2) {
-            // defind(deps, factory)
-            // defind(id, factory)
-            factory = deps;
-            if (isType(id, 'Array')) {
-                deps = id;
-                id = '';
+        if (factory == null) {
+            // define(factory);
+            if (deps == null) {
+                factory = id;
+                id = null;
             } else {
+                // define(id, factory)
+                // define(deps, factory)
+                factory = deps;
                 deps = null;
+                if (isType(id, 'Array')) {
+                    deps = id;
+                    id = null;
+                }
             }
         }
+
         var isDepsDec = true;
         if (!isType(deps, 'Array') && isType(factory, 'Function')) {
             deps = [];
@@ -386,7 +386,7 @@
 
     define.amd = {};
 
-    require = requireFactory(cid());
+    var require = requireFactory(cid());
 
     function requireFactory(base) {
         return function (deps, callback, isForce) {
@@ -423,18 +423,9 @@
         };
     }
 
-    function parseId(id) {
-        var segment = id.split('!');
-        return {
-            pluginId: segment[0],
-            resourceId: segment[1]
-        };
-    }
-
     function getModule(id) {
         return cachedMod[id] || (cachedMod[id] = new Module(id));
     }
-
 
     function relativeUri(uri, base) {
         var segment = base.split('/').concat(uri.split('/'));
@@ -471,6 +462,11 @@
         return (str + '/').indexOf(prefix + '/') === 0;
     }
 
+    function dirName(uri) {
+        var dir = uri.match(/([^?#]*)(\/[^$])/);
+        return (dir && dir[1]) || '';
+    }
+
     function resolveId(id, base) {
 
         id = packagedId(id);
@@ -479,9 +475,17 @@
         if (id.indexOf('.') === 0) {
             id = relativeUri(id, dirName(base));
         }
-        // 
+        
         id = packagedId(id);
         return id;
+    }
+
+    function parseId(id) {
+        var segment = id.split('!');
+        return {
+            pluginId: segment[0],
+            resourceId: segment[1]
+        };
     }
 
     function mappedId(id, base) {
@@ -622,7 +626,9 @@
         }
     };
 
-    global.define = define;
-    global.require = require;
+    if (!global.define) {
+        global.define = define;
+        global.require = require;
+    }
 
 })(window, document);
