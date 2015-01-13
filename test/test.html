@@ -4,14 +4,14 @@
 <meta charset="UTF-8" />
 <title>loader test</title>
 
-
-<script src="/src/kitty.js"></script>
-<!-- <script src="impl/esl/esl.js"></script> -->
-<!-- <script src="impl/requirejs/require.js"></script> -->
-<!-- <script src="impl/needs/needs.js"></script> -->
-<!-- <script src="impl/lsjs/lsjs.js"></script> -->
+<script src="../src/kitty.js"></script>
+<!-- 
+<script src="impl/esl/esl.js"></script> -->
+<!--script src="impl/requirejs/require.js"></script-->
+<!--script src="impl/needs/needs.js"></script-->
+<!--script src="impl/lsjs/lsjs.js"></script-->
 <script>
-require.config( {
+require.config({
     waitSeconds: 5,
     urlArgs: 'urlArgs',
     baseUrl: '.',
@@ -44,20 +44,29 @@ require.config( {
         'moduleconf/cat': {
             'desc': 'cat'
         }
-    },
-    noRequests: {
-        'noRequests/simple/cat': 'noRequests/simple/index',
-        'noRequests/all/cat': '*',
-        'noRequests/complex/child': [ 'noRequests/complex/index1', 'noRequests/complex/index2' ]
     }
-} );
-require.config( {
+});
+
+require.config({
     urlArgs: {
         css: 'css',
         amd: 'amd',
         'amd/simpleDependency': 'amdsd'
     }
-} );
+});
+
+function hasModuleRequest( moduleId ) {
+    var scripts = document.getElementsByTagName( 'script' );
+    var len = scripts.length;
+
+    while ( len-- ) {
+        if ( scripts[ len ].getAttribute( 'data-module-id' ) == moduleId ) {
+            return true;
+        }
+    }
+
+    return false;
+}
 </script>
 
 <style>
@@ -231,6 +240,10 @@ input { font-size: 12px; width: 210px;}
         <td class="uncheck"></td>
     </tr>
     <tr>
+        <td><input value="amd/combineplugin3" type="button" data-ignore="timestat"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
         <td><input value="multiResources" type="button" data-ignore="timestat"></td>
         <td class="uncheck"></td>
     </tr>
@@ -254,6 +267,10 @@ input { font-size: 12px; width: 210px;}
     </tr>
     <tr>
         <td><input value="defineInScript" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="defineInScriptLoadSoon" type="button" data-ignore="timestat"></td>
         <td class="uncheck"></td>
     </tr>
     <tr>
@@ -310,50 +327,334 @@ input { font-size: 12px; width: 210px;}
         <td><input value="objectPackage" type="button" data-ignore="timestat"></td>
         <td class="uncheck"></td>
     </tr>
-<!--     <tr>
+    <tr>
+        <th colspan="2" align="left">Conf shim:</th>
+    </tr>
+    <tr>
+        <td><input value="pureShim" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="mixedSimpleShim" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="mixedSimpleShim_hasDeps" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="mixedSimpleShim_hybirdDep" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="mixedSimpleShim_indirectHybirdDep" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
+        <td><input value="mixedComplexShim" type="button"></td>
+        <td class="uncheck"></td>
+    </tr>
+    <tr>
         <th colspan="2" align="left">Conf urlArgs:</th>
     </tr>
     <tr>
         <td><input value="urlArgs" type="button" data-ignore="timestat"></td>
         <td class="uncheck"></td>
     </tr>
-   <tr>
-        <th colspan="2" align="left">Conf noRequests:</th>
+    <tr>
+        <th colspan="2" align="left">Conf bundles:</th>
     </tr>
-     <tr>
-        <td><input value="simpleNoRequests" type="button" data-ignore="timestat"></td>
+    <tr>
+        <td><input value="simpleBundles" type="button" data-ignore="timestat"></td>
         <td class="uncheck"></td>
     </tr>
     <tr>
-        <td><input value="allNoRequests" type="button" data-ignore="timestat"></td>
+        <td><input value="complexBundles" type="button" data-ignore="timestat"></td>
         <td class="uncheck"></td>
     </tr>
-    <tr>
-        <td><input value="complexNoRequests_match1" type="button" data-ignore="timestat"></td>
-        <td class="uncheck"></td>
-    </tr>
-    <tr>
-        <td><input value="complexNoRequests_match2" type="button" data-ignore="timestat"></td>
-        <td class="uncheck"></td>
-    </tr>
-    <tr>
-        <td><input value="complexNoRequests_noMatch" type="button" data-ignore="timestat"></td>
-        <td class="uncheck"></td>
-    </tr>
-    <tr>
-        <td><input value="complexNoRequests_alone" type="button" data-ignore="timestat"></td>
-        <td class="uncheck"></td>
-    </tr> -->
-    <!-- see #10
-    <tr>
-        <th colspan="2" align="left">Read Conf:</th>
-    </tr>
-    <tr>
-        <td><input value="readConfig" type="button" data-ignore="timestat"></td>
-        <td class="uncheck"></td>
-    </tr>
-     -->
 </table>
+
+<script>
+// shim test
+require.config({
+    paths: {
+        shimPureIndex: 'shim/pure/index',
+        shimPureA: 'shim/pure/a',
+        shimPureB: 'shim/pure/b',
+        shimPureC: 'shim/pure/c',
+        shimPureD: 'shim/pure/d',
+        shimPureE: 'shim/pure/e',
+        shimPureF: 'shim/pure/f',
+        shimMixedSA: 'shim/mixed/sa',
+        shimMixedSB: 'shim/mixed/sb',
+        shimMixedSC: 'shim/mixed/sc',
+        shimMixedSD: 'shim/mixed/sd',
+        shimMixedSE: 'shim/mixed/se',
+        shimMixedSF: 'shim/mixed/sf',
+        shimMixedLib: 'shim/mixed/shimLib',
+        shimMixedHybird: 'shim/mixed/shimHybird',
+        shimMixedHybird2: 'shim/mixed/shimHybird2',
+        shimMixedUI: 'shim/mixed/shimUI'
+    },
+    shim: {
+        shimPureIndex: {
+            deps: ['shimPureA', 'shimPureB'],
+            exports: 'shimPureIndex.exports' 
+        },
+        shimPureA: {
+            exports: 'shimPureA',
+            deps: ['shimPureC', 'shimPureD', 'shimPureE'],
+            init: function (c, d, e) {
+                return {
+                    name: shimPureA.name,
+                    c: shimPureC,
+                    cname: shimPureC.name,
+                    d: shimPureD,
+                    dname: shimPureD.name,
+                    e: e,
+                    ename: e.name
+                };
+            }
+        },
+        shimPureB: {exports: 'shimPureBOther'},
+        shimPureC: ['shimPureD', 'shimPureE'],
+        shimPureE: {
+            deps: ['shimPureD', 'shimPureB'],
+            init: function (d, b) {
+                return {
+                    name: shimPureEOther.name,
+                    raw: shimPureEOther,
+                    d: shimPureD,
+                    dname: shimPureD.name,
+                    b: b,
+                    bname: b.name
+                };
+            }
+        },
+        shimPureF: {
+            init: function () {
+                return {
+                    name: shimPureFName
+                };
+            }
+        },
+        shimMixedSB: {exports: 'shimMixedSBOther'},
+        shimMixedSA: {
+            deps: ['shimMixedSE', 'shimMixedSF'],
+            init: function (e, f) {
+                return {
+                    raw: shimMixedSA,
+                    e: e,
+                    f: f
+                };
+            }
+        },
+        shimMixedSD: {exports: 'shimMixedSDOther'},
+        shimMixedSE: {
+            deps: ['shimMixedSC', 'shimMixedSD'],
+            exports: 'shimMixedSE'
+        },
+        shimMixedSF: {
+            deps: ['shimMixedSC'],
+            exports: 'shimMixedSFOther'
+        },
+        shimMixedUI: {
+            exports: 'shimMixedUI',
+            deps: ['shimMixedLib']
+        }
+    }
+});
+
+function pureShim(stateTd, callback) {
+    require(['shimPureIndex', 'shimPureA', 'shimPureF'], function (index, a, f) {
+        if (
+            index === shimPureIndex.exports
+            && index.bname === 'shim pure b'
+            && index.b === shimPureBOther
+            && a.name === 'shim pure a'
+            && a.cname === 'shim pure c'
+            && a.dname === 'shim pure d'
+            && a.ename === 'shim pure e'
+            && a.c === shimPureC
+            && a.d === shimPureD
+            && a.e.raw === shimPureEOther
+            && a.e.name === 'shim pure e'
+            && a.e.dname === 'shim pure d'
+            && a.e.bname === 'shim pure b'
+            && a.e.d === shimPureD
+            && a.e.b === shimPureBOther
+            && f.name === 'shim pure f'
+        ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    });
+}
+
+function mixedSimpleShim(stateTd, callback) {
+    require(['shim/mixed/simpleIndex'], function (index) {
+        if (
+            index.name === 'shim mixed simpleIndex'
+            && index.check()
+        ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    });
+}
+
+function mixedSimpleShim_hasDeps(stateTd, callback) {
+    require(['shim/mixed/simpleHasDepsIndex'], function (index) {
+        if (
+            index.name === 'shim mixed simpleHasDepsIndex'
+            && index.check()
+        ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    });
+}
+
+function mixedSimpleShim_hybirdDep(stateTd, callback) {
+    require(['shim/mixed/simpleHybirdDepIndex'], function (index) {
+        if (
+            index.name === 'shim mixed simpleHybirdDepIndex'
+            && index.check()
+        ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    });
+}
+
+function mixedSimpleShim_indirectHybirdDep(stateTd, callback) {
+    require(['shim/mixed/simpleIndirectHybirdDepIndex'], function (index) {
+        if (
+            index.name === 'shim mixed simpleIndirectHybirdDepIndex'
+            && index.check()
+        ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    });
+}
+
+function mixedComplexShim(stateTd, callback) {
+    require(['shim/mixed/complexIndex'], function (index) {
+        if (
+            index.name === 'shim mixed complexIndex'
+            && index.check()
+        ) {
+            stateTd.className = 'pass';
+        }
+        else {
+            stateTd.className = 'fail';
+        }
+
+        if ( typeof callback == 'function' ) {
+            setTimeout( callback, 1 );
+        }
+    });
+}
+</script>
+
+<script>
+// bundles test
+require.config({
+    bundles: {
+        'bundles/simple/index': [ 
+            'bundles/simple/cat',
+            'bundles/simple/plugin!resource'
+        ],
+        'bundles/complex/index1': [
+            'bundles/complex/view1',
+            'bundles/complex/model1',
+            'bundles/complex/tpl',
+            'bundles/complex/tpl!bundles/complex/tpl1',
+            'bundles/complex/lib'
+        ]
+    }
+});
+
+function simpleBundles(stateTd, callback) {
+    require(['bundles/simple/cat', 'bundles/simple/plugin!resource'],
+        function (cat, res) {
+            if (
+                !hasModuleRequest('bundles/simple/cat')
+                && !hasModuleRequest('bundles/simple/plugin')
+                && hasModuleRequest('bundles/simple/index')
+                && cat.name == 'bundles/simple/cat'
+                && res == 'bundles/simple/plugin!resource'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+
+function complexBundles(stateTd, callback) {
+    require(['bundles/complex/view1', 'bundles/complex/index1'],
+        function (view1, index1) {
+            if (
+                !hasModuleRequest('bundles/complex/view1')
+                && !hasModuleRequest('bundles/complex/model1')
+                && !hasModuleRequest('bundles/complex/tpl')
+                && !hasModuleRequest('bundles/complex/lib')
+                && hasModuleRequest('bundles/complex/index1')
+                && view1.check()
+                && index1.check()
+                && index1.name == 'bundles/complex/index1'
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            if ( typeof callback == 'function' ) {
+                setTimeout( callback, 1 );
+            }
+        }
+    );
+}
+</script>
 
 <script>
 
@@ -369,6 +670,44 @@ function defineInScript( stateTd, callback ) {
 
         callback();
     });
+}
+
+function defineInScriptLoadSoon(stateTd, callback) {
+    define('define-in-script-load-soon/index', ['require', './cat'],
+        function (require) {
+            var cat = require('./cat');
+            return {
+                name: 'define-in-script-load-soon/index',
+                check: function () {
+                    return cat.name === 'define-in-script-load-soon/cat'
+                }
+            };
+        }
+    );
+
+    setTimeout(function () {
+        
+        if (hasModuleRequest('define-in-script-load-soon/cat')) {
+            stateTd.className = 'fail';
+            callback();
+            return;
+        }
+
+        require(['define-in-script-load-soon/index'], function (index) {
+            if (hasModuleRequest('define-in-script-load-soon/cat')
+                && index.name === 'define-in-script-load-soon/index' 
+                && index.check()
+            ) {
+                stateTd.className = 'pass';
+            }
+            else {
+                stateTd.className = 'fail';
+            }
+
+            callback();
+        })
+
+    }, 1);
 }
 
 function defineManyInScript( stateTd, callback ) {
@@ -532,186 +871,6 @@ function nonstandardId( stateTd, callback ) {
         callback();
     });
 }
-
-function readConfig( stateTd, callback ) {
-    var conf = require.config();
-    var ok = conf.baseUrl == './'
-        && conf.paths.css == '../src/css'
-        && conf.paths.abspath == '/test/pathstest'
-        && conf.map.usecjs.simple == 'cjs/simple'
-        && conf.map['usecjs/change2amd'].simple == 'amd/simple'
-        && conf.packages[0] == 'pkgclassic/1.0'
-        && conf.packages[1].name == 'pkgsetmain'
-        && conf.config['moduleconf/cat'].desc == 'cat'
-        && conf.urlArgs['*'] == 'urlArgs'
-        && conf.urlArgs['amd/simpleDependency'] == 'amdsd';
-
-    if (ok) {
-        conf = require.config({
-            paths: {
-                'justfortest': 'justfortestpath'
-            }
-        });
-        ok = conf.baseUrl == './'
-            && conf.paths.css == '../src/css'
-            && conf.paths.abspath == '/test/pathstest'
-            && conf.map.usecjs.simple == 'cjs/simple'
-            && conf.map['usecjs/change2amd'].simple == 'amd/simple'
-            && conf.packages[0] == 'pkgclassic/1.0'
-            && conf.packages[1].name == 'pkgsetmain'
-            && conf.config['moduleconf/cat'].desc == 'cat'
-            && conf.urlArgs['*'] == 'urlArgs'
-            && conf.urlArgs['amd/simpleDependency'] == 'amdsd'
-            && conf.paths.justfortest == 'justfortestpath';
-    }
-
-    if (ok) {
-        stateTd.className = 'pass';
-    }
-    else {
-        stateTd.className = 'fail';
-    }
-    callback();
-}
-
-function hasModuleRequest( moduleId ) {
-    var scripts = document.getElementsByTagName( 'script' );
-    var len = scripts.length;
-
-    while ( len-- ) {
-        if ( scripts[ len ].getAttribute( 'data-require-id' ) == moduleId ) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-function complexNoRequests_match1( stateTd, callback ) {
-    require( ['noRequests/complex/child/cat', 'noRequests/complex/index1' ],
-        function (cat, index) {
-            if (
-                !hasModuleRequest('noRequests/complex/child/cat')
-                && cat.name == 'noRequests/complex/child/cat'
-                && index.name == 'noRequests/complex/index1'
-            ) {
-                stateTd.className = 'pass';
-            }
-            else {
-                stateTd.className = 'fail';
-            }
-
-            if ( typeof callback == 'function' ) {
-                setTimeout( callback, 1 );
-            }
-        }
-    );
-}
-
-function complexNoRequests_match2( stateTd, callback ) {
-    require( ['noRequests/complex/index2', 'noRequests/complex/child/dog'],
-        function (index, dog) {
-            if (
-                !hasModuleRequest('noRequests/complex/child/dog')
-                && dog.name == 'noRequests/complex/child/dog'
-                && index.name == 'noRequests/complex/index2'
-            ) {
-                stateTd.className = 'pass';
-            }
-            else {
-                stateTd.className = 'fail';
-            }
-
-            if ( typeof callback == 'function' ) {
-                setTimeout( callback, 1 );
-            }
-        }
-    );
-}
-
-function complexNoRequests_noMatch( stateTd, callback ) {
-    require( ['noRequests/complex/child/tiger', 'noRequests/complex/index3' ],
-        function (tiger, index) {
-            if (
-                hasModuleRequest('noRequests/complex/child/tiger')
-                && tiger.name == 'noRequests/complex/child/tiger'
-                && index.name == 'noRequests/complex/index3'
-            ) {
-                stateTd.className = 'pass';
-            }
-            else {
-                stateTd.className = 'fail';
-            }
-
-            if ( typeof callback == 'function' ) {
-                setTimeout( callback, 1 );
-            }
-        }
-    );
-}
-
-function complexNoRequests_alone( stateTd, callback ) {
-    require( ['noRequests/complex/child/lion', 'noRequests/complex/index3' ],
-        function (lion, index) {
-            if (
-                hasModuleRequest('noRequests/complex/child/lion')
-                && lion.name == 'noRequests/complex/child/lion'
-            ) {
-                stateTd.className = 'pass';
-            }
-            else {
-                stateTd.className = 'fail';
-            }
-
-            if ( typeof callback == 'function' ) {
-                setTimeout( callback, 1 );
-            }
-        }
-    );
-}
-
-function simpleNoRequests( stateTd, callback ) {
-    require( ['noRequests/simple/cat', 'noRequests/simple/index' ],
-        function (cat, index) {
-            if (
-                !hasModuleRequest('noRequests/simple/cat')
-                && cat.name == 'noRequests/simple/cat'
-                && index.name == 'noRequests/simple/index'
-            ) {
-                stateTd.className = 'pass';
-            }
-            else {
-                stateTd.className = 'fail';
-            }
-
-            if ( typeof callback == 'function' ) {
-                setTimeout( callback, 1 );
-            }
-        }
-    );
-}
-
-function allNoRequests( stateTd, callback ) {
-    require( ['noRequests/all/cat', 'noRequests/all/index' ],
-        function (cat, index) {
-            if (
-                !hasModuleRequest('noRequests/all/cat')
-                && cat.name == 'noRequests/all/cat'
-                && index.name == 'noRequests/all/index'
-            ) {
-                stateTd.className = 'pass';
-            }
-            else {
-                stateTd.className = 'fail';
-            }
-
-            if ( typeof callback == 'function' ) {
-                setTimeout( callback, 1 );
-            }
-        }
-    );
-}
-
 
 function checkNormalModule( name, stateTd, module, callback ) {
     if (

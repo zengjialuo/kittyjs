@@ -321,12 +321,18 @@
                 };
             }
             var cacheId = normalizeResourceId(module, pluginAndResource);
-            if ( cachedMod[cacheId] ) {
+            if (cachedMod[cacheId]) {
                 callback();
             } else {
                 plugin.load(resourceId, module.require, onload, module.requireModule(pluginId).config());
             }
         }, 1);
+    }
+
+    function execPlugin(cacheId) {
+        var m = cachedMod[cacheId];
+        // FIXME
+        return m.factory || m.exports;
     }
 
     function normalizeResourceId(module, pluginAndResource) {
@@ -396,7 +402,7 @@
                 if (parsedId.resourceId) {
                     var module = getModule(base);
                     var cacheId = normalizeResourceId(module, deps);
-                    return cachedMod[cacheId].exports;
+                    return execPlugin(cacheId);
                 } else {
                     var id = resolveId(parsedId.pluginId, base);
                     return getModule(id).exec();
@@ -568,11 +574,12 @@
         m.fetch = function () {
             if (m.state >= STATUS.FETCHING) {return;}
 
+            m.state = STATUS.FETCHING;
             if (m.deps && m.deps.length !== 0) {
                 m.require(m.deps, function(){
                     Module.prototype.fetch.call(m);
                 });
-            } {
+            } else {
                 Module.prototype.fetch.call(m);
             }
         };
@@ -629,6 +636,7 @@
     if (!global.define) {
         global.define = define;
         global.require = require;
+        global.cachedMod = cachedMod;
     }
 
 })(window, document);

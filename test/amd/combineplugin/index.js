@@ -27,7 +27,7 @@ define( 'plugin/html2',
 
 define( 
     'amd/combineplugin/index', 
-    [
+    [ 
         'amd/combineplugin/cat',
         'plugin/html2!plugin/resource'
     ], 

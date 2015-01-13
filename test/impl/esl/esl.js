@@ -13,6 +13,9 @@ var require;
 var esl;
 /* jshint ignore:end */
 
+/* eslint-disable guard-for-in */
+/* eslint-env amd:false */
+
 (function (global) {
     // "mod"开头的变量或函数为内部模块管理函数
     // 为提高压缩率，不使用function或object包装
@@ -25,24 +28,36 @@ var esl;
      */
     var modModules = {};
 
-    /**
-     * 自动定义的模块表
-     *
-     * 模块define factory是用到时才执行，但是以下几种情况需要自动马上执行：
-     * 1. require( [moduleId], callback )
-     * 2. plugin module: require( 'plugin!resource' )
-     *
-     * @inner
-     * @type {Object}
-     */
-    var autoDefineModules = {};
-
-
     // 模块状态枚举量
     var MODULE_PRE_DEFINED = 1;
     var MODULE_ANALYZED = 2;
     var MODULE_PREPARED = 3;
     var MODULE_DEFINED = 4;
+
+    /**
+     * 自动定义的模块表
+     *
+     * 模块define factory是用到时才执行，但是以下几种情况需要自动马上执行：
+     * 1. require([moduleId], callback)
+     * 2. plugin module and plugin resource: require('plugin!resource')
+     * 3. shim module
+     *
+     * @inner
+     * @type {Object}
+     */
+    var modAutoDefineModules = {};
+
+    /**
+     * 标记模块自动进行定义
+     *
+     * @inner
+     * @param {string} id 模块id
+     */
+    function modFlagAutoDefine(id) {
+        if (!modIs(id, MODULE_DEFINED)) {
+            modAutoDefineModules[id] = 1;
+        }
+    }
 
     /**
      * 内建module名称集合
@@ -51,7 +66,7 @@ var esl;
      * @type {Object}
      */
     var BUILDIN_MODULE = {
-        require: require,
+        require: globalRequire,
         exports: 1,
         module: 1
     };
@@ -88,10 +103,11 @@ var esl;
         config     : {},
         map        : {},
         packages   : [],
+        shim       : {},
         // #begin-ignore
         waitSeconds: 0,
         // #end-ignore
-        noRequests : {},
+        bundles    : {},
         urlArgs    : {}
     };
     /* eslint-enable key-spacing */
@@ -103,7 +119,7 @@ var esl;
      * @param {Function=} callback 加载完成的回调函数
      * @return {*} requireId为string时返回模块暴露对象
      */
-    function require(requireId, callback) {
+    function globalRequire(requireId, callback) {
         // #begin-ignore
         // #begin assertNotContainRelativeId
         // 确定require的模块id不包含相对id。用于global require，提前预防难以跟踪的错误出现
@@ -160,14 +176,14 @@ var esl;
      *
      * @type {string}
      */
-    require.version = '1.8.6';
+    globalRequire.version = '2.0.0';
 
     /**
      * loader名称
      *
      * @type {string}
      */
-    require.loader = 'esl';
+    globalRequire.loader = 'esl';
 
     /**
      * 将模块标识转换成相对的url
@@ -175,7 +191,7 @@ var esl;
      * @param {string} id 模块标识
      * @return {string}
      */
-    require.toUrl = actualGlobalRequire.toUrl;
+    globalRequire.toUrl = actualGlobalRequire.toUrl;
 
     // #begin-ignore
     /**
@@ -234,11 +250,9 @@ var esl;
             }
         }
 
-        /* eslint-disable guard-for-in */
-        for (var id in autoDefineModules) {
+        for (var id in modAutoDefineModules) {
             checkError(id, 1);
         }
-        /* eslint-enable guard-for-in */
 
         if (hangModules.length || missModules.length) {
             throw new Error(
@@ -267,7 +281,7 @@ var esl;
      * @inner
      * @param {string} currentId 匿名define的模块的id
      */
-    function completePreDefine(currentId) {
+    function modCompletePreDefine(currentId) {
         // HACK: 这里在IE下有个性能陷阱，不能使用任何变量。
         //       否则貌似会形成变量引用和修改的读写锁，导致wait4PreDefine释放困难
         each(wait4PreDefine, function (mod) {
@@ -279,7 +293,6 @@ var esl;
         });
 
         wait4PreDefine.length = 0;
-        modAnalyse(currentId);
     }
 
     /**
@@ -289,7 +302,7 @@ var esl;
      * @param {Array=} dependencies 依赖模块列表
      * @param {Function=} factory 创建模块的工厂方法
      */
-    function define(id, dependencies, factory) {
+    function globalDefine(id, dependencies, factory) {
         // define(factory)
         // define(dependencies, factory)
         // define(id, factory)
@@ -313,10 +326,6 @@ var esl;
             return;
         }
 
-        // 出现window不是疏忽
-        // esl设计是做为browser端的loader
-        // 闭包的global更多意义在于：
-        //     define和require方法可以被挂到用户自定义对象中
         var opera = window.opera;
 
         // IE下通过current script的data-require-id获取当前id
@@ -342,7 +351,7 @@ var esl;
         }
     }
 
-    define.amd = {};
+    globalDefine.amd = {};
 
     /**
      * 模块配置获取函数
@@ -384,7 +393,6 @@ var esl;
         // depMs: 实际依赖的模块集合，数组形式
         // depMkv: 实际依赖的模块集合，表形式，便于查找
         // depRs: 实际依赖的资源集合
-        // depPMs: 用于加载资源的模块集合，key是模块名，value是1，仅用于快捷查找
         // ------------------------------------
         if (!modModules[id]) {
             /* eslint-disable key-spacing */
@@ -400,26 +408,24 @@ var esl;
                 require     : createLocalRequire(id),
                 depMs       : [],
                 depMkv      : {},
-                depRs       : [],
-                depPMs      : []
+                depRs       : []
             };
             /* eslint-enable key-spacing */
         }
     }
 
     /**
-     * 预分析模块
+     * 开始执行模块定义前的准备工作
      *
      * 首先，完成对factory中声明依赖的分析提取
      * 然后，尝试加载"资源加载所需模块"
      *
      * 需要先加载模块的原因是：如果模块不存在，无法进行resourceId normalize化
-     * modAnalyse完成后续的依赖分析处理，并进行依赖模块的加载
      *
      * @inner
      * @param {string} id 模块id
      */
-    function modAnalyse(id) {
+    function modPrepare(id) {
         var mod = modModules[id];
         if (!mod || modIs(id, MODULE_ANALYZED)) {
             return;
@@ -446,6 +452,7 @@ var esl;
         }
 
         var requireModules = [];
+        var depResources = [];
         each(deps, function (depId, index) {
             var idInfo = parseId(depId);
             var absId = normalize(idInfo.mod, id);
@@ -471,8 +478,7 @@ var esl;
                         mod: absId,
                         res: idInfo.res
                     };
-                    autoDefineModules[absId] = 1;
-                    mod.depPMs.push(absId);
+                    depResources.push(depId);
                     mod.depRs.push(resInfo);
                 }
 
@@ -503,7 +509,18 @@ var esl;
 
         mod.state = MODULE_ANALYZED;
         modInitFactoryInvoker(id);
-        nativeRequire(requireModules);
+        nativeAsyncRequire(requireModules);
+        depResources.length && mod.require(
+            depResources,
+            function () {
+                each(mod.depRs, function (res) {
+                    if (!res.absId) {
+                        res.absId = normalize(res.id, id);
+                    }
+                });
+                modAutoDefine();
+            }
+        );
     }
 
     /**
@@ -511,13 +528,12 @@ var esl;
      *
      * @inner
      */
-    function modAutoInvoke() {
-        /* eslint-disable guard-for-in */
-        for (var id in autoDefineModules) {
+    function modAutoDefine() {
+        for (var id in modAutoDefineModules) {
+            modPrepare(id);
             modUpdatePreparedState(id);
             modTryInvokeFactory(id);
         }
-        /* eslint-enable guard-for-in */
     }
 
     /**
@@ -531,6 +547,7 @@ var esl;
         update(id);
 
         function update(id) {
+            modPrepare(id);
             if (!modIs(id, MODULE_ANALYZED)) {
                 return false;
             }
@@ -554,7 +571,7 @@ var esl;
             prepared && each(
                 mod.depRs,
                 function (dep) {
-                    prepared = !!(dep.absId && modIs(dep.absId, MODULE_DEFINED));
+                    prepared = !!dep.absId;
                     return prepared;
                 }
             );
@@ -579,26 +596,6 @@ var esl;
         var invoking;
 
         mod.invokeFactory = invokeFactory;
-        /* eslint-disable max-nested-callbacks */
-        each(
-            mod.depPMs,
-            function (pluginModuleId) {
-
-                modAddDefinedListener(
-                    pluginModuleId,
-                    function () {
-                        each(mod.depRs, function (res) {
-                            if (!res.absId && res.mod === pluginModuleId) {
-                                res.absId = normalize(res.id, id);
-                                nativeRequire([res.absId], modAutoInvoke);
-                            }
-                        });
-                    }
-                );
-
-            }
-        );
-        /* eslint-enable max-nested-callbacks */
 
         /**
          * 初始化模块
@@ -614,7 +611,6 @@ var esl;
 
             // 拼接factory invoke所需的arguments
             var factoryReady = 1;
-            var factoryDeps = [];
             each(
                 mod.factoryDeps,
                 function (dep) {
@@ -622,31 +618,24 @@ var esl;
 
                     if (!BUILDIN_MODULE[depId]) {
                         modTryInvokeFactory(depId);
-                        if (!modIs(depId, MODULE_DEFINED)) {
-                            factoryReady = 0;
-                            return false;
-                        }
+                        return (factoryReady = modIs(depId, MODULE_DEFINED));
                     }
-
-                    factoryDeps.push(depId);
                 }
             );
 
             if (factoryReady) {
                 try {
-                    var args = modGetModulesExports(
-                        factoryDeps,
-                        {
-                            require: mod.require,
-                            exports: mod.exports,
-                            module: mod
-                        }
-                    );
-
                     // 调用factory函数初始化module
                     var factory = mod.factory;
                     var exports = typeof factory === 'function'
-                        ? factory.apply(global, args)
+                        ? factory.apply(global, modGetModulesExports(
+                                mod.factoryDeps,
+                                {
+                                    require: mod.require,
+                                    exports: mod.exports,
+                                    module: mod
+                                }
+                            ))
                         : factory;
 
                     if (exports != null) {
@@ -654,7 +643,6 @@ var esl;
                     }
 
                     mod.invokeFactory = null;
-                    delete autoDefineModules[id];
                 }
                 catch (ex) {
                     invoking = 0;
@@ -716,7 +704,10 @@ var esl;
         each(
             modules,
             function (id, index) {
-                args[index] = buildinModules[id] || modGetModuleExports(id);
+                if (typeof id === 'object') {
+                    id = id.absId;
+                }
+                args[index] = buildinModules[id] || modModules[id].exports;
             }
         );
 
@@ -763,6 +754,7 @@ var esl;
         var listeners = modDefinedListeners[id] || [];
         var mod = modModules[id];
         mod.state = MODULE_DEFINED;
+        delete modAutoDefineModules[id];
 
         var len = listeners.length;
         while (len--) {
@@ -773,70 +765,31 @@ var esl;
 
         // 清理listeners
         listeners.length = 0;
-        delete modDefinedListeners[id];
+        modDefinedListeners[id] = null;
     }
 
     /**
-     * 获取模块的exports
+     * 异步加载模块
+     * 内部使用，模块ID必须是经过normalize的Top-Level ID
      *
      * @inner
-     * @param {string} id 模块标识
-     * @return {*} 模块的exports
-     */
-    function modGetModuleExports(id) {
-        if (modIs(id, MODULE_DEFINED)) {
-            return modModules[id].exports;
-        }
-
-        return null;
-    }
-
-    /**
-     * 获取模块
-     *
-     * @param {string|Array} ids 模块名称或模块名称列表
+     * @param {Array} ids 模块名称或模块名称列表
      * @param {Function=} callback 获取模块完成时的回调函数
      * @param {string} baseId 基础id，用于当ids是relative id时的normalize
-     * @param {Object} noRequests 无需发起请求的模块集合
-     * @return {Object} 模块对象
      */
-    function nativeRequire(ids, callback, baseId, noRequests) {
-        // 根据 https://github.com/amdjs/amdjs-api/wiki/require
-        // It MUST throw an error if the module has not
-        // already been loaded and evaluated.
-        if (typeof ids === 'string') {
-            modTryInvokeFactory(ids);
-            if (!modIs(ids, MODULE_DEFINED)) {
-                throw new Error('[MODULE_MISS]"' + ids + '" is not exists!');
-            }
-
-            return modGetModuleExports(ids);
-        }
-
-        noRequests = noRequests || {};
+    function nativeAsyncRequire(ids, callback, baseId) {
         var isCallbackCalled = 0;
-        if (ids instanceof Array) {
-            tryFinishRequire();
 
-            if (!isCallbackCalled) {
-                each(ids, function (id) {
-                    if (!(BUILDIN_MODULE[id] || modIs(id, MODULE_DEFINED))) {
-                        modAddDefinedListener(id, tryFinishRequire);
-
-                        if (!noRequests[id]) {
-                            (id.indexOf('!') > 0
-                                ? loadResource
-                                : loadModule
-                            )(id, baseId);
-                        }
-
-                        modAnalyse(id);
-                    }
-                });
-
-                modAutoInvoke();
+        each(ids, function (id) {
+            if (!(BUILDIN_MODULE[id] || modIs(id, MODULE_DEFINED))) {
+                modAddDefinedListener(id, tryFinishRequire);
+                (id.indexOf('!') > 0
+                    ? loadResource
+                    : loadModule
+                )(id, baseId);
             }
-        }
+        });
+        tryFinishRequire();
 
         /**
          * 尝试完成require，调用callback
@@ -845,7 +798,7 @@ var esl;
          * @inner
          */
         function tryFinishRequire() {
-            if (!isCallbackCalled) {
+            if (typeof callback === 'function' && !isCallbackCalled) {
                 var isAllCompleted = 1;
                 each(ids, function (id) {
                     if (!BUILDIN_MODULE[id]) {
@@ -857,7 +810,7 @@ var esl;
                 if (isAllCompleted) {
                     isCallbackCalled = 1;
 
-                    (typeof callback === 'function') && callback.apply(
+                    callback.apply(
                         global,
                         modGetModulesExports(ids, BUILDIN_MODULE)
                     );
@@ -881,51 +834,80 @@ var esl;
      * @param {string} moduleId 模块标识
      */
     function loadModule(moduleId) {
+        // 加载过的模块，就不要再继续了
         if (loadingModules[moduleId] || modModules[moduleId]) {
             return;
         }
-
         loadingModules[moduleId] = 1;
 
-        // 创建script标签
-        //
-        // 这里不挂接onerror的错误处理
-        // 因为高级浏览器在devtool的console面板会报错
-        // 再throw一个Error多此一举了
-        var script = document.createElement('script');
-        script.setAttribute('data-require-id', moduleId);
-        script.src = toUrl(moduleId + '.js');
-        script.async = true;
-        if (script.readyState) {
-            script.onreadystatechange = loadedListener;
+        // 初始化相关 shim 的配置
+        var shimConf = requireConf.shim[moduleId];
+        if (shimConf instanceof Array) {
+            requireConf.shim[moduleId] = shimConf = {
+                deps: shimConf
+            };
+        }
+
+        // shim依赖的模块需要自动标识为shim
+        // 无论是纯正的shim模块还是hybird模块
+        var shimDeps = shimConf && (shimConf.deps || []);
+        if (shimDeps) {
+            each(shimDeps, function (dep) {
+                if (!requireConf.shim[dep]) {
+                    requireConf.shim[dep] = {};
+                }
+            });
+            actualGlobalRequire(shimDeps, load);
         }
         else {
-            script.onload = loadedListener;
+            load();
         }
-        appendScript(script);
+
+        /**
+         * 发送请求去加载模块
+         *
+         * @inner
+         */
+        function load() {
+            /* eslint-disable no-use-before-define */
+            var bundleModuleId = bundlesIndex[moduleId];
+            createScript(bundleModuleId || moduleId, loaded);
+            /* eslint-enable no-use-before-define */
+        }
 
         /**
          * script标签加载完成的事件处理函数
          *
          * @inner
          */
-        function loadedListener() {
-            var readyState = script.readyState;
-            if (
-                typeof readyState === 'undefined'
-                || /^(loaded|complete)$/.test(readyState)
-            ) {
-                script.onload = script.onreadystatechange = null;
-                script = null;
-
-                completePreDefine(moduleId);
-                /* eslint-disable guard-for-in */
-                for (var key in autoDefineModules) {
-                    modAnalyse(key);
+        function loaded() {
+            if (shimConf) {
+                var exports;
+                if (typeof shimConf.init === 'function') {
+                    exports = shimConf.init.apply(
+                        global,
+                        modGetModulesExports(shimDeps, BUILDIN_MODULE)
+                    );
                 }
-                /* eslint-enable guard-for-in */
-                modAutoInvoke();
+
+                if (exports == null && shimConf.exports) {
+                    exports = global;
+                    each(
+                        shimConf.exports.split('.'),
+                        function (prop) {
+                            exports = exports[prop];
+                            return !!exports;
+                        }
+                    );
+                }
+
+                globalDefine(moduleId, shimDeps, exports || {});
             }
+            else {
+                modCompletePreDefine(moduleId);
+            }
+
+            modAutoDefine();
         }
     }
 
@@ -940,6 +922,14 @@ var esl;
         if (modModules[pluginAndResource]) {
             return;
         }
+
+        /* eslint-disable no-use-before-define */
+        var bundleModuleId = bundlesIndex[pluginAndResource];
+        if (bundleModuleId) {
+            loadModule(bundleModuleId);
+            return;
+        }
+        /* eslint-enable no-use-before-define */
 
         var idInfo = parseId(pluginAndResource);
         var resource = {
@@ -967,9 +957,8 @@ var esl;
          * @param {string} text 模块声明字符串
          */
         pluginOnload.fromText = function (id, text) {
-            autoDefineModules[id] = 1;
             new Function(text)();
-            completePreDefine(id);
+            modCompletePreDefine(id);
         };
         /* jshint ignore:end */
 
@@ -992,7 +981,7 @@ var esl;
             );
         }
 
-        load(modGetModuleExports(idInfo.mod));
+        load(actualGlobalRequire(idInfo.mod));
     }
 
     /**
@@ -1000,9 +989,8 @@ var esl;
      *
      * @param {Object} conf 配置对象
      */
-    require.config = function (conf) {
+    globalRequire.config = function (conf) {
         if (conf) {
-            /* eslint-disable guard-for-in */
             for (var key in requireConf) {
                 var newValue = conf[key];
                 var oldValue = requireConf[key];
@@ -1029,42 +1017,10 @@ var esl;
                     }
                 }
             }
-            /* eslint-enable guard-for-in */
 
             createConfIndex();
         }
-
-        // 配置信息对象clone返回，避免返回结果对象被用户程序修改可能导致的问题
-        // return clone(requireConf);
     };
-
-    /**
-     * 对象克隆，支持raw type, Array, raw Object
-     *
-     * @inner
-     * @param {*} source 要克隆的对象
-     * @return {*}
-     */
-    // function clone(source) {
-    //     var result = source;
-
-    //     if (source instanceof Array) {
-    //         result = [];
-    //         each(source, function (item, i) {
-    //             result[i] = clone(item);
-    //         });
-    //     }
-    //     else if (typeof source === 'object') {
-    //         result = {};
-    //         for (var key in source) {
-    //             if (source.hasOwnProperty(key)) {
-    //                 result[key] = clone(source[key]);
-    //             }
-    //         }
-    //     }
-
-    //     return result;
-    // }
 
     // 初始化时需要创建配置索引
     createConfIndex();
@@ -1094,20 +1050,20 @@ var esl;
     var mappingIdIndex;
 
     /**
+     * bundles内部索引
+     *
+     * @inner
+     * @type {Object}
+     */
+    var bundlesIndex;
+
+    /**
      * urlArgs内部索引
      *
      * @inner
      * @type {Array}
      */
     var urlArgsIndex;
-
-    /**
-     * noRequests内部索引
-     *
-     * @inner
-     * @type {Array}
-     */
-    var noRequestsIndex;
 
     /**
      * 将key为module id prefix的Object，生成数组形式的索引，并按照长度和字面排序
@@ -1168,21 +1124,16 @@ var esl;
         // create urlArgs index
         urlArgsIndex = createKVSortedIndex(requireConf.urlArgs, 1);
 
-        // create noRequests index
-        noRequestsIndex = createKVSortedIndex(requireConf.noRequests);
-        each(noRequestsIndex, function (item) {
-            var value = item.v;
-            var mapIndex = {};
-            item.v = mapIndex;
-
-            if (!(value instanceof Array)) {
-                value = [value];
-            }
-
-            each(value, function (meetId) {
-                mapIndex[meetId] = 1;
-            });
-        });
+        // create bundles index
+        bundlesIndex = {};
+        /* eslint-disable no-use-before-define */
+        function bundlesIterator(id) {
+            bundlesIndex[id] = key;
+        }
+        /* eslint-enable no-use-before-define */
+        for (var key in requireConf.bundles) {
+            each(requireConf.bundles[key], bundlesIterator);
+        }
     }
 
     /**
@@ -1268,18 +1219,27 @@ var esl;
      */
     function createLocalRequire(baseId) {
         var requiredCache = {};
+
         function req(requireId, callback) {
             if (typeof requireId === 'string') {
                 if (!requiredCache[requireId]) {
-                    requiredCache[requireId] =
-                        nativeRequire(normalize(requireId, baseId));
+                    var topLevelId = normalize(requireId, baseId);
+
+                    // 根据 https://github.com/amdjs/amdjs-api/wiki/require
+                    // It MUST throw an error if the module has not
+                    // already been loaded and evaluated.
+                    modTryInvokeFactory(topLevelId);
+                    if (!modIs(topLevelId, MODULE_DEFINED)) {
+                        throw new Error('[MODULE_MISS]"' + topLevelId + '" is not exists!');
+                    }
+
+                    requiredCache[requireId] = modModules[topLevelId].exports;
                 }
 
                 return requiredCache[requireId];
             }
             else if (requireId instanceof Array) {
                 // 分析是否有resource，取出pluginModule先
-                var pluginModules = [];
                 var pureModules = [];
                 var normalizedIds = [];
 
@@ -1288,65 +1248,44 @@ var esl;
                     function (id, i) {
                         var idInfo = parseId(id);
                         var absId = normalize(idInfo.mod, baseId);
-                        pureModules.push(absId);
-                        autoDefineModules[absId] = 1;
+                        var resId = idInfo.res;
+                        var normalizedId = absId;
 
-                        if (idInfo.res) {
-                            pluginModules.push(absId);
-                            normalizedIds[i] = null;
-                        }
-                        else {
-                            normalizedIds[i] = absId;
-                        }
-                    }
-                );
-
-                var noRequestModules = {};
-                each(
-                    pureModules,
-                    function (id) {
-                        var meet;
-                        indexRetrieve(
-                            id,
-                            noRequestsIndex,
-                            function (value) {
-                                meet = value;
-                            }
-                        );
-
-                        if (meet) {
-                            if (meet['*']) {
-                                noRequestModules[id] = 1;
+                        if (resId) {
+                            var trueResId = absId + '!' + resId;
+                            if (resId.indexOf('.') !== 0 && bundlesIndex[trueResId]) {
+                                absId = normalizedId = trueResId;
                             }
                             else {
-                                each(pureModules, function (meetId) {
-                                    if (meet[meetId]) {
-                                        noRequestModules[id] = 1;
-                                        return false;
-                                    }
-                                });
+                                normalizedId = null;
                             }
                         }
+
+                        normalizedIds[i] = normalizedId;
+                        modFlagAutoDefine(absId);
+                        pureModules.push(absId);
                     }
                 );
 
                 // 加载模块
-                nativeRequire(
+                nativeAsyncRequire(
                     pureModules,
                     function () {
                         /* jshint ignore:start */
                         each(normalizedIds, function (id, i) {
                             if (id == null) {
-                                normalizedIds[i] = normalize(requireId[i], baseId);
+                                id = normalizedIds[i] = normalize(requireId[i], baseId);
+                                modFlagAutoDefine(id);
                             }
                         });
                         /* jshint ignore:end */
 
-                        nativeRequire(normalizedIds, callback, baseId);
+                        modAutoDefine();
+                        nativeAsyncRequire(normalizedIds, callback, baseId);
                     },
-                    baseId,
-                    noRequestModules
+                    baseId
                 );
+                modAutoDefine();
             }
         }
 
@@ -1402,7 +1341,6 @@ var esl;
             baseId,
             mappingIdIndex,
             function (value) {
-
                 indexRetrieve(
                     moduleId,
                     value,
@@ -1410,13 +1348,12 @@ var esl;
                         moduleId = moduleId.replace(mdKey, mdValue);
                     }
                 );
-
             }
         );
 
         if (resourceId) {
-            var mod = modGetModuleExports(moduleId);
-            resourceId = mod.normalize
+            var mod = modIs(moduleId, MODULE_DEFINED) && actualGlobalRequire(moduleId);
+            resourceId = mod && mod.normalize
                 ? mod.normalize(
                     resourceId,
                     function (resId) {
@@ -1494,8 +1431,6 @@ var esl;
                 res: segs[1]
             };
         }
-
-        return null;
     }
 
     /**
@@ -1572,13 +1507,35 @@ var esl;
         headElement = baseElement.parentNode;
     }
 
-    /**
-     * 向页面中插入script标签
-     *
-     * @inner
-     * @param {HTMLScriptElement} script script标签
-     */
-    function appendScript(script) {
+    function createScript(moduleId, onload) {
+        // 创建script标签
+        //
+        // 这里不挂接onerror的错误处理
+        // 因为高级浏览器在devtool的console面板会报错
+        // 再throw一个Error多此一举了
+        var script = document.createElement('script');
+        script.setAttribute('data-require-id', moduleId);
+        script.src = toUrl(moduleId + '.js');
+        script.async = true;
+        if (script.readyState) {
+            script.onreadystatechange = innerOnload;
+        }
+        else {
+            script.onload = innerOnload;
+        }
+
+        function innerOnload() {
+            var readyState = script.readyState;
+            if (
+                typeof readyState === 'undefined'
+                || /^(loaded|complete)$/.test(readyState)
+            ) {
+                script.onload = script.onreadystatechange = null;
+                script = null;
+
+                onload();
+            }
+        }
         currentlyAddingScript = script;
 
         // If BASE tag is in play, using appendChild is a problem for IE6.
@@ -1642,32 +1599,16 @@ var esl;
     }
 
     // 暴露全局对象
-    //
-    // 如果define已经存在，说明已经有一个amd loader了，避免覆盖
-    // 这里有一个假设，只有amd loader会用define，但是，任何形式的loader可能会用require
-    //
-    // 使用 `global.` 的原因是，让被运行在第三方页面的代码，也能方便的用loader
-    // 第三方页面很可能存在一个loader，就算不存在，可能未来也会有。所以不能在全局用loader
-    // 这时，把esl的代码拿过去，只改全局IIFE最后的 `this`，就能获得namespace上的loader
-    //
-    //  // 声明自己的namespace
-    //  var selfnamespace = {};
-    //
-    //  // 这里是esl的代码
-    //  (function (global){
-    //      // esl的实现
-    //  })(selfnamespace); // 改这里的this
-    //
-    if (!global.define) {
-        global.define = define;
+    if (!define) {
+        define = globalDefine;
 
         // 可能碰到其他形式的loader，所以，不要覆盖人家
-        if (!global.require) {
-            global.require = require;
+        if (!require) {
+            require = globalRequire;
         }
 
         // 如果存在其他版本的esl，在define那里就判断过了，不会进入这个分支
         // 所以这里就不判断了，直接写
-        global.esl = require;
+        esl = globalRequire;
     }
 })(this);
